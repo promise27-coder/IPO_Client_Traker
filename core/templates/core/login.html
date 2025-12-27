@@ -1,0 +1,24 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="flex justify-center mt-10">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md border border-gray-700">
+        <h2 class="text-2xl font-bold mb-6 text-center text-blue-400">🔐 Login</h2>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <div class="space-y-4">
+                {{ form.as_p }}
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded mt-6">Login</button>
+        </form>
+        
+        <p class="text-center text-gray-400 mt-4 text-sm">
+            Account nathi? <a href="{% url 'signup' %}" class="text-blue-400 hover:underline">Sign Up</a>
+        </p>
+    </div>
+</div>
+<script>
+    document.querySelectorAll('input').forEach(el => el.className = 'w-full bg-gray-700 border border-gray-600 rounded p-2 text-white mb-2');
+    document.querySelectorAll('label').forEach(el => el.className = 'block text-gray-400 text-sm mb-1');
+</script>
+{% endblock %}

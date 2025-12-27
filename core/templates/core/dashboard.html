@@ -1,0 +1,159 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<style>
+    /* Spreadsheet Styling */
+    .sheet-input { background: transparent; border: none; width: 100%; color: white; padding: 6px; outline: none; }
+    .sheet-input:focus { background: #374151; border-radius: 4px; border: 1px solid #6b7280; }
+    .master-row:hover { background-color: #1f2937; }
+    th { white-space: nowrap; font-size: 0.75rem; letter-spacing: 0.05em; }
+    td { border-bottom: 1px solid #374151; padding: 0; white-space: nowrap; } /* white-space: nowrap added for horizontal scroll */
+    input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #10b981; }
+    
+    /* Toggle Animation */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+</style>
+
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-gray-700 pb-6">
+    <div class="flex gap-2 w-full md:w-auto">
+        <form method="GET" class="flex-grow md:flex-grow-0">
+            <select name="ipo_id" class="w-full md:w-64 p-2 bg-gray-800 border border-gray-600 rounded text-white font-bold h-10 focus:ring-2 focus:ring-blue-500" onchange="this.form.submit()">
+                <option value="" disabled {% if not current_ipo %}selected{% endif %}>⬇ Select IPO to View...</option>
+                {% for ipo in ipos %}
+                    <option value="{{ ipo.id }}" {% if current_ipo.id == ipo.id %}selected{% endif %}>{{ ipo.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="{% url 'add_ipo' %}" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold h-10 flex items-center border border-gray-500 whitespace-nowrap">
+            + New IPO
+        </a>
+    </div>
+</div>
+
+<details class="mb-8 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden group">
+    <summary class="bg-gray-900 p-3 cursor-pointer flex justify-between items-center hover:bg-gray-800 transition">
+        <h3 class="text-purple-400 font-bold flex items-center gap-2">
+            👥 Master Diary  <span class="text-xs text-gray-500 font-normal ml-2">(Click to Open/Close)</span>
+        </h3>
+        <span class="text-gray-400 group-open:rotate-180 transition-transform duration-200">▼</span>
+    </summary>
+    
+    <div class="p-3 border-t border-gray-700">
+        <form action="{% url 'add_master_entry' %}" method="POST" class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
+            {% csrf_token %}
+            <input type="text" name="nickname" placeholder="Name *" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600" required>
+            <input type="text" name="broker" placeholder="Broker *" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600" required>
+            <input type="text" name="demat_acc" placeholder="Demat ID *" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600" required>
+            <input type="text" name="pan_number" placeholder="PAN (Optional)" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600">
+            <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded">Add</button>
+        </form>
+
+        <div class="max-h-60 overflow-y-auto border border-gray-600 rounded">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-800 text-gray-400 uppercase text-xs sticky top-0 z-10 shadow-sm">
+                    <tr>
+                        <th class="p-2 pl-4 w-1/4">Nickname</th>
+                        <th class="p-2 w-1/4">Broker</th>
+                        <th class="p-2 w-1/4">Demat ID</th>
+                        <th class="p-2 w-1/4">PAN</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for m in masters %}
+                    <tr class="master-row transition">
+                        <td><input type="text" value="{{ m.nickname }}" class="sheet-input font-bold pl-4" onchange="saveMasterData({{ m.id }}, 'nickname', this.value)"></td>
+                        <td><input type="text" value="{{ m.broker }}" class="sheet-input text-gray-300" onchange="saveMasterData({{ m.id }}, 'broker', this.value)"></td>
+                        <td><input type="text" value="{{ m.demat_acc }}" class="sheet-input text-gray-300" onchange="saveMasterData({{ m.id }}, 'demat_acc', this.value)"></td>
+                        <td><input type="text" value="{{ m.pan_number }}" class="sheet-input text-gray-400 uppercase" onchange="saveMasterData({{ m.id }}, 'pan_number', this.value)"></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="p-4 text-center text-gray-500 text-sm">List khali che.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</details>
+
+{% if current_ipo %}
+<div>
+    <div class="flex justify-between items-center mb-3">
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            📊 Applicants for: <span class="text-blue-400">{{ current_ipo.name }}</span>
+        </h2>
+        
+        <a href="{% url 'import_from_master' current_ipo.id %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-bold text-sm flex items-center shadow-lg gap-2">
+            ✅ Select from Master
+        </a>
+    </div>
+
+    <div class="overflow-auto bg-gray-800 rounded-lg shadow-xl border border-gray-700 h-[60vh]">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-gray-900 text-gray-300 uppercase text-xs sticky top-0 z-10 shadow-md">
+                <tr>
+                    <th class="p-3 border-b border-gray-600">Name</th>
+                    <th class="p-3 border-b border-gray-600">Broker</th>
+                    <th class="p-3 border-b border-gray-600 text-center">App?</th>
+                    <th class="p-3 border-b border-gray-600">Status</th>
+                    <th class="p-3 border-b border-gray-600 text-right">Profit</th>
+                    <th class="p-3 border-b border-gray-600 text-right bg-gray-800 text-green-400">45% Share</th>
+                    <th class="p-3 border-b border-gray-600 text-center">UPI?</th>
+                    <th class="p-3 border-b border-gray-600 text-center">Paid?</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm">
+                {% for client in clients %}
+                <tr class="hover:bg-gray-750 border-b border-gray-700">
+                    <td class="p-0"><input type="text" value="{{ client.nickname }}" class="sheet-input font-bold pl-3" onchange="saveData({{ client.id }}, 'nickname', this.value)"></td>
+                    <td class="p-0"><input type="text" value="{{ client.broker }}" class="sheet-input pl-3" onchange="saveData({{ client.id }}, 'broker', this.value)"></td>
+                    <td class="p-0 text-center"><input type="checkbox" {% if client.is_applied %}checked{% endif %} onchange="saveData({{ client.id }}, 'is_applied', this.checked)"></td>
+                    <td class="p-0">
+                        <select class="sheet-input bg-transparent pl-2" onchange="saveData({{ client.id }}, 'allotment_status', this.value)">
+                            <option value="Pending" {% if client.allotment_status == 'Pending' %}selected{% endif %} class="text-black">Pending</option>
+                            <option value="Allotted" {% if client.allotment_status == 'Allotted' %}selected{% endif %} class="text-black">Allotted ✅</option>
+                            <option value="Not Allotted" {% if client.allotment_status == 'Not Allotted' %}selected{% endif %} class="text-black">Not Allotted ❌</option>
+                        </select>
+                    </td>
+                    <td class="p-0"><input type="number" value="{{ client.total_profit }}" class="sheet-input text-right pr-3" onchange="saveData({{ client.id }}, 'total_profit', this.value)"></td>
+                    <td class="p-3 text-right text-green-400 font-mono font-bold" id="profit-{{ client.id }}">{{ client.profit_share_45 }}</td>
+                    <td class="p-0 text-center"><input type="checkbox" {% if client.upi_request_sent %}checked{% endif %} onchange="saveData({{ client.id }}, 'upi_request_sent', this.checked)"></td>
+                    <td class="p-0 text-center"><input type="checkbox" {% if client.payment_cleared %}checked{% endif %} onchange="saveData({{ client.id }}, 'payment_cleared', this.checked)"></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="p-10 text-center text-gray-500">No data. Use 'Select from Master' button!</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-2 text-right">
+        <a href="{% url 'add_client' %}?ipo_id={{ current_ipo.id }}" class="text-xs text-gray-500 hover:text-white underline">+ Add Single Row Manually</a>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    function saveData(id, field, value) {
+        fetch(`/update-cell/${id}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ 'field': field, 'value': value })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && field === 'total_profit') {
+                document.getElementById(`profit-${id}`).innerText = data.profit_share_45;
+            }
+        });
+    }
+
+    function saveMasterData(id, field, value) {
+        fetch(`/update-master/${id}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ 'field': field, 'value': value })
+        });
+    }
+</script>
+{% endblock %}
